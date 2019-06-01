@@ -3,6 +3,7 @@
 --                                                              --
 -- Copyright (c) 2019 Kris Harris                               --
 ------------------------------------------------------------------
+
 obs                 = obslua
 
 -- global settings
@@ -16,7 +17,7 @@ MAX_SOURCE_INDEX    = 6
 --              scripting api delgate functions
 ------------------------------------------------------------------
 
-function script_description()
+function script_description() 
     return "Automatically mute and unmute global audio sources when changing scenes.\n\nMade by SchmuckCo\n\n\n\nSelect which audio sources should be managed:"
 end
 
@@ -77,6 +78,8 @@ function script_load(settings)
 	-- disconnect callbacks that are intended to last until the script is
     -- unloaded.
     obs.obs_frontend_add_event_callback(HandleFrontendEvent)
+    local sh = obs.obs_get_signal_handler()
+    ConnectTransitionHandlers()
 end
 
 ------------------------------------------------------------------
@@ -85,15 +88,54 @@ end
 
 
 function HandleFrontendEvent(event)
-    -- obs.script_log(obs.LOG_INFO, "frontend event=" .. event)
-
     if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED then
         OnSceneChange()
+    elseif event == obs.OBS_FRONTEND_EVENT_TRANSITION_CHANGED then
+        OnTransitionChanged()
     end
 end
 
+-- function HandleTransitionStart(cd)
+--     local transition = obs.calldata_source(cd, "source")
+--     local from_scene = obs.obs_transition_get_source(transition, obs.OBS_TRANSITION_SOURCE_A)
+--     local to_scene   = obs.obs_transition_get_source(transition, obs.OBS_TRANSITION_SOURCE_B)
+    
+--     obs.script_log(obs.LOG_INFO, "Transition Started from " .. obs.obs_source_get_name(from_scene) .. " to " .. obs.obs_source_get_name(to_scene))
+
+--     obs.obs_source_release(from_scene)
+--     obs.obs_source_release(to_scene)
+-- end
+
+-- function HandleTransitionEnd(cd)
+
+-- end
+
 function OnSceneChange()
     SetMuteForManagedSources(IsCurrentSceneTagged())
+end
+
+-- call this function when the script loads or the transition changes in order to connect/disconnect transition signal handlers
+current_transition_sigh = nil
+function ConnectTransitionHandlers()
+    local ct = obs.obs_frontend_get_current_transition()
+    local new_sigh = obs.obs_source_get_signal_handler(ct)
+    obs.obs_source_release(ct)
+
+    if current_transition_sigh ~= new_sigh then
+        if current_transition_sigh ~= nil then
+            obs.signal_handler_disconnect(current_transition_sigh, "transition_start", HandleTransitionStart)
+        end
+        obs.signal_handler_connect(new_sigh, "transition_start", HandleTransitionStart)
+        current_transition_sigh = new_sigh
+    end
+end
+
+function OnTransitionChanged()
+    ConnectTransitionHandlers()
+end
+
+function DoesNameMatchTrigger(name)
+    return string.match(name, trigger_string) ~= nil
 end
 
 function IsCurrentSceneTagged()
@@ -101,8 +143,7 @@ function IsCurrentSceneTagged()
     local scene_name = obs.obs_source_get_name(current_scene)
 
     obs.obs_source_release(current_scene)
-
-    return string.match(scene_name, trigger_string) ~= nil
+    return DoesNameMatchTrigger(scene_name)
 end
 
 function SetMuteForManagedSources(muted)
