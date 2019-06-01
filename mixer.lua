@@ -18,7 +18,7 @@ MAX_SOURCE_INDEX    = 6
 ------------------------------------------------------------------
 
 function script_description() 
-    return "Automatically mute and unmute global audio sources when changing scenes.\n\nMade by SchmuckCo\n\n\n\nSelect which audio sources should be managed:"
+    return "Automatically mute and unmute global audio sources when changing scenes.\n\nMade by qrunchmonkey\n\n\n\nSelect which audio sources should be managed:"
 end
 
 function script_properties()
